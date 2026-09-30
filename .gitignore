@@ -1,0 +1,10 @@
+# Personal Family Spend Ledger data
+*.json
+!manifest.json
+family-ledger-*.json
+family-spend-ledger-*.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
