@@ -71,7 +71,7 @@ function render(){
     </main>
   </div><div id="m" class="modal"></div>`;
   renderMonthControls();
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=4').catch(()=>{});
 }
 
 function dash(){
