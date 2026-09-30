@@ -4,3 +4,7 @@
 
 .topactions,.heroActions{display:flex;gap:8px;flex-wrap:wrap}.secondary{border:1px solid var(--line);background:#fffdf8;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}.check input{width:auto!important}.box{max-width:720px!important}.box input,.box select,.box textarea{box-sizing:border-box}.box textarea{min-height:90px}.box .actions{margin-top:16px}
 @media(max-width:700px){.topactions,.heroActions{width:100%}.topactions button,.heroActions button{flex:1}.heroActions{margin-top:10px}}
+
+.addTxBtn{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;position:relative;z-index:20}
+.modal{z-index:1000;pointer-events:auto}.modal .box{pointer-events:auto}.modal button,.modal input,.modal select,.modal textarea{pointer-events:auto;touch-action:manipulation}
+@media(max-width:700px){.top{position:relative}.addTxBtn{min-height:42px;white-space:nowrap}}

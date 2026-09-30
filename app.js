@@ -66,12 +66,14 @@ function render(){
       <div class="local">Local first<br><small>Your data stays in this browser.</small></div>
     </aside>
     <main class="main">
-      <header class="top"><div class="topmonth"><span class="muted">SELECT PERIOD</span>${monthPicker()}</div><div class="topactions"><button class="secondary" onclick="form(null,'Income')">＋ Add income</button><button class="primary" onclick="form(null,'Expense')">＋ Add expense</button></div></header>
+      <header class="top"><div class="topmonth"><span class="muted">SELECT PERIOD</span>${monthPicker()}</div><button type="button" class="primary addTxBtn" id="addTxBtn">＋ Add Transaction</button></header>
       <section class="content">${page==='dashboard'?dash():page==='transactions'?tx():page==='budgets'?budgets():page==='settings'?settings():backup()}</section>
     </main>
   </div><div id="m" class="modal"></div>`;
   renderMonthControls();
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=4').catch(()=>{});
+  const addBtn=document.querySelector('#addTxBtn');
+  if(addBtn) addBtn.addEventListener('click',()=>form(null));
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=5',{updateViaCache:'none'}).catch(()=>{});
 }
 
 function dash(){
@@ -79,7 +81,7 @@ function dash(){
   const ex=txInMonth(month).filter(x=>x.type==='Expense'), by={};
   ex.forEach(x=>by[x.category]=(by[x.category]||0)+ +x.amount);
   const recent=txInMonth(month).sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id))).slice(0,7);
-  return `<div class="hero"><div><span class="muted">MONTHLY OVERVIEW</span><h1>${monthLabel(month)}</h1><p class="muted">Change month or year above. Balances carry forward automatically.</p></div><div class="heroActions"><button class="secondary" onclick="form(null,'Income')">＋ Add income</button><button class="primary" onclick="form(null,'Expense')">＋ Add expense</button></div></div>
+  return `<div class="hero"><div><span class="muted">MONTHLY OVERVIEW</span><h1>${monthLabel(month)}</h1><p class="muted">Change month or year above. Balances carry forward automatically.</p></div></div>
   <div class="cards">
     <div class="card metric"><span class="muted">OPENING BALANCE</span><div class="value">${money(opening)}</div><small class="muted">Cumulative before ${monthLabel(month)}</small></div>
     <div class="card metric"><span class="muted">INCOME</span><div class="value">${money(t.i)}</div></div>
@@ -135,7 +137,7 @@ function form(id, forcedType){
   edit=id??null;
   const existing=id?S.transactions.find(x=>String(x.id)===String(id)):null;
   const t=existing||{date:new Date().toISOString().slice(0,10),amount:'',type:forcedType||'Expense',category:'',beneficiary:S.beneficiaries[0]||'Me',method:S.methods[0]||'Cash',recurring:false,notes:''};
-  const cats=[...new Set([...(t.type==='Income'?S.categories.income:S.categories.expense),...S.categories.expense,...S.categories.income])];
+  const cats=t.type==='Income'?[...S.categories.income]:[...S.categories.expense];
   const modal=document.querySelector('#m');
   modal.innerHTML=`<div class="box"><h2>${id?'Edit':'Add'} ${t.type}</h2>
     <div class="form">
@@ -148,16 +150,17 @@ function form(id, forcedType){
       <label class="check"><input id="txRecurring" type="checkbox" ${t.recurring?'checked':''}> Recurring</label>
       <label class="full">Notes<textarea id="txNotes" placeholder="Optional notes">${esc(t.notes||'')}</textarea></label>
     </div>
-    <div class="actions"><button onclick="closeM()">Cancel</button><button class="primary" onclick="saveTx()">Save transaction</button></div>
+    <div class="actions"><button type="button" onclick="closeM()">Cancel</button><button type="button" class="primary" id="saveTxBtn">Save transaction</button></div>
   </div>`;
   modal.classList.add('open');
+  const saveBtn=document.querySelector('#saveTxBtn');
+  if(saveBtn) saveBtn.addEventListener('click',saveTx);
 }
 function refreshCategories(){
   const type=document.querySelector('#txType')?.value||'Expense';
-  const current=document.querySelector('#txCategory')?.value||'';
-  const arr=type==='Income'?S.categories.income:S.categories.expense;
   const el=document.querySelector('#txCategory');
-  if(el)el.innerHTML=arr.map(x=>`<option ${x===current?'selected':''}>${esc(x)}</option>`).join('');
+  const arr=type==='Income'?S.categories.income:S.categories.expense;
+  if(el)el.innerHTML=arr.map(x=>`<option>${esc(x)}</option>`).join('');
 }
 function closeM(){document.querySelector('#m').classList.remove('open')}
 function saveTx(){
