@@ -66,7 +66,7 @@ function render(){
       <div class="local">Local first<br><small>Your data stays in this browser.</small></div>
     </aside>
     <main class="main">
-      <header class="top"><div class="topmonth"><span class="muted">SELECT PERIOD</span>${monthPicker()}</div><button class="primary" onclick="form()">＋ Add transaction</button></header>
+      <header class="top"><div class="topmonth"><span class="muted">SELECT PERIOD</span>${monthPicker()}</div><div class="topactions"><button class="secondary" onclick="form(null,'Income')">＋ Add income</button><button class="primary" onclick="form(null,'Expense')">＋ Add expense</button></div></header>
       <section class="content">${page==='dashboard'?dash():page==='transactions'?tx():page==='budgets'?budgets():page==='settings'?settings():backup()}</section>
     </main>
   </div><div id="m" class="modal"></div>`;
@@ -79,7 +79,7 @@ function dash(){
   const ex=txInMonth(month).filter(x=>x.type==='Expense'), by={};
   ex.forEach(x=>by[x.category]=(by[x.category]||0)+ +x.amount);
   const recent=txInMonth(month).sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id))).slice(0,7);
-  return `<div class="hero"><div><span class="muted">MONTHLY OVERVIEW</span><h1>${monthLabel(month)}</h1><p class="muted">Change month or year above. Balances carry forward automatically.</p></div><button class="primary" onclick="form()">＋ Add spend / income</button></div>
+  return `<div class="hero"><div><span class="muted">MONTHLY OVERVIEW</span><h1>${monthLabel(month)}</h1><p class="muted">Change month or year above. Balances carry forward automatically.</p></div><div class="heroActions"><button class="secondary" onclick="form(null,'Income')">＋ Add income</button><button class="primary" onclick="form(null,'Expense')">＋ Add expense</button></div></div>
   <div class="cards">
     <div class="card metric"><span class="muted">OPENING BALANCE</span><div class="value">${money(opening)}</div><small class="muted">Cumulative before ${monthLabel(month)}</small></div>
     <div class="card metric"><span class="muted">INCOME</span><div class="value">${money(t.i)}</div></div>
@@ -131,18 +131,54 @@ function filter(){
   let a=txInMonth(month).filter(x=>(!q||`${x.category} ${x.beneficiary} ${x.notes}`.toLowerCase().includes(q))&&(!ty||x.type===ty)&&(!ca||x.category===ca)&&(!be||x.beneficiary===be));
   document.querySelector('#tbl').innerHTML=table(a);
 }
-function form(id){
+function form(id, forcedType){
   edit=id??null;
-  let t=id?S.transactions.find(x=>String(x.id)===String(id)):{date:new Date().toISOString().slice(0,10),amount:'',type:'Expense',category:S.categories.expense[0],beneficiary:S.beneficiaries[0],method:S.methods[0],recurring:false,notes:''};
-  document.querySelector('#m').innerHTML=`<div class="box"><h2>${id?'Edit':'Add'} transaction</h2><div class="form"><label>Date<input id="d" type="date" value="${t.date}"></label><label>Amount<input id="a" type="number" value="${t.amount}"></label><label>Type<select id="t"><option>Expense</option><option ${t.type==='Income'?'selected':''}>Income</option></select></label><label>Category<select id="c">${[...new Set([...S.categories.expense,...S.categories.income])].map(x=>`<option ${x===t.category?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Beneficiary<select id="b">${S.beneficiaries.map(x=>`<option ${x===t.beneficiary?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Payment Method<select id="p">${S.methods.map(x=>`<option ${x===t.method?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label><input id="r" type="checkbox" ${t.recurring?'checked':''}> Recurring</label><label class="full">Notes<textarea id="n">${esc(t.notes||'')}</textarea></label></div><div class="actions"><button onclick="closeM()">Cancel</button> <button class="primary" onclick="saveTx()">Save</button></div></div>`;
-  document.querySelector('#m').classList.add('open');
+  const existing=id?S.transactions.find(x=>String(x.id)===String(id)):null;
+  const t=existing||{date:new Date().toISOString().slice(0,10),amount:'',type:forcedType||'Expense',category:'',beneficiary:S.beneficiaries[0]||'Me',method:S.methods[0]||'Cash',recurring:false,notes:''};
+  const cats=[...new Set([...(t.type==='Income'?S.categories.income:S.categories.expense),...S.categories.expense,...S.categories.income])];
+  const modal=document.querySelector('#m');
+  modal.innerHTML=`<div class="box"><h2>${id?'Edit':'Add'} ${t.type}</h2>
+    <div class="form">
+      <label>Date<input id="txDate" type="date" value="${esc(t.date)}"></label>
+      <label>Amount<input id="txAmount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(t.amount)}" placeholder="0"></label>
+      <label>Type<select id="txType" onchange="refreshCategories()"><option ${t.type==='Expense'?'selected':''}>Expense</option><option ${t.type==='Income'?'selected':''}>Income</option></select></label>
+      <label>Category<select id="txCategory">${cats.map(x=>`<option ${x===t.category?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>Beneficiary<select id="txBeneficiary">${S.beneficiaries.map(x=>`<option ${x===t.beneficiary?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>Payment Method<select id="txMethod">${S.methods.map(x=>`<option ${x===t.method?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="check"><input id="txRecurring" type="checkbox" ${t.recurring?'checked':''}> Recurring</label>
+      <label class="full">Notes<textarea id="txNotes" placeholder="Optional notes">${esc(t.notes||'')}</textarea></label>
+    </div>
+    <div class="actions"><button onclick="closeM()">Cancel</button><button class="primary" onclick="saveTx()">Save transaction</button></div>
+  </div>`;
+  modal.classList.add('open');
+}
+function refreshCategories(){
+  const type=document.querySelector('#txType')?.value||'Expense';
+  const current=document.querySelector('#txCategory')?.value||'';
+  const arr=type==='Income'?S.categories.income:S.categories.expense;
+  const el=document.querySelector('#txCategory');
+  if(el)el.innerHTML=arr.map(x=>`<option ${x===current?'selected':''}>${esc(x)}</option>`).join('');
 }
 function closeM(){document.querySelector('#m').classList.remove('open')}
 function saveTx(){
-  let x={id:edit||Date.now(),date:d.value,amount:+a.value,type:t.value,category:c.value,beneficiary:b.value,method:p.value,recurring:r.checked,notes:n.value};
-  if(!x.date||!x.amount)return alert('Enter date and amount');
-  let i=S.transactions.findIndex(y=>String(y.id)===String(x.id)); i<0?S.transactions.push(x):S.transactions[i]=x;
-  save(); closeM(); month=x.date.slice(0,7); render();
+  const date=document.querySelector('#txDate')?.value;
+  const amount=Number(document.querySelector('#txAmount')?.value);
+  const type=document.querySelector('#txType')?.value;
+  const category=document.querySelector('#txCategory')?.value;
+  const beneficiary=document.querySelector('#txBeneficiary')?.value;
+  const method=document.querySelector('#txMethod')?.value;
+  const recurring=!!document.querySelector('#txRecurring')?.checked;
+  const notes=document.querySelector('#txNotes')?.value||'';
+  if(!date){alert('Please select a date.');return}
+  if(!Number.isFinite(amount)||amount<=0){alert('Please enter an amount greater than 0.');return}
+  if(!category){alert('Please select a category.');return}
+  const x={id:edit||('txn-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)),date,amount,type,category,beneficiary,method,recurring,notes};
+  const i=S.transactions.findIndex(y=>String(y.id)===String(x.id));
+  if(i<0)S.transactions.push(x);else S.transactions[i]=x;
+  save();
+  closeM();
+  month=date.slice(0,7);
+  render();
 }
 function del(id){if(confirm('Delete transaction?')){S.transactions=S.transactions.filter(x=>String(x.id)!==String(id));save();render()}}
 function settings(){
